@@ -11,16 +11,17 @@ return new class extends Migration
      */
     public function up(): void
     {
-{
-    Schema::create('datasets', function (Blueprint $table) {
-        $table->id();
-        $table->string('name');
-        $table->string('file_path');
-        $table->integer('total_rows')->default(0); 
-        $table->integer('total_columns')->default(0); 
-        $table->timestamps();
-    });
-}
+        Schema::create('datasets', function (Blueprint $table) {
+            $table->id();
+            $table->string('name');
+            $table->string('file_path');
+            $table->integer('total_rows')->default(0); 
+            $table->integer('total_columns')->default(0); 
+            $table->longText('analysis_json')->nullable();
+            $table->string('status')->default('pending');
+            
+            $table->timestamps();
+        });
     }
 
     /**
