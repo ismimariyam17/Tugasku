@@ -15,7 +15,7 @@ class DatasetController extends Controller
             ->latest()
             ->get();
             
-        return view('dashboard', compact('datasets'));
+        return view('data_science_index', compact('datasets'));
     }
 
     public function store(Request $request)
