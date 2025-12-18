@@ -23,56 +23,55 @@ class CodeGeneratorController extends Controller
         $framework = $request->framework;
 
         try {
-            // Panggil fungsi request ke Gemini
             $generatedCode = $this->askGemini($framework, $prompt);
 
             return back()->with([
-                'success' => 'Berhasil generate code menggunakan Gemini 2.0 Flash!',
+                'success' => 'Berhasil generate code menggunakan Gemini!',
                 'generated_code' => $generatedCode,
                 'prompt' => $prompt,
                 'framework' => $framework
             ]);
-
         } catch (\Exception $e) {
-            // Tampilkan error jika ada
             return back()->withErrors(['error' => 'Gagal: ' . $e->getMessage()]);
         }
     }
 
-    private function askGemini($framework, $userPrompt)
+    private function askGemini(string $framework, string $userPrompt): string
     {
         $apiKey = env('GEMINI_API_KEY');
 
         if (empty($apiKey)) {
-            throw new \Exception("API Key belum disetting.");
+            throw new \Exception("GEMINI_API_KEY belum disetting di .env");
         }
 
-        // 1. Susun Instruksi System
-        $systemInstruction = "You are an expert software engineer specialized in $framework. "
-            . "Your task is to generate clean, production-ready code based on the user description. "
-            . "IMPORTANT: Output ONLY the raw code without markdown backticks (```) and without explanation text. "
-            . "If comments are needed, write them inside the code.";
+        $systemInstruction =
+            "You are an expert software engineer specialized in {$framework}. " .
+            "Your task is to generate clean, production-ready code based on the user description. " .
+            "IMPORTANT: Output ONLY the raw code without markdown backticks (```) and without explanation text. " .
+            "If comments are needed, write them inside the code.";
 
-        // 2. Susun Prompt Spesifik
-        if ($framework == 'laravel') {
-            $fullPrompt = "Generate a complete Laravel Controller or Model (PHP code) for this requirement: '$userPrompt'. Include namespace App\Http\Controllers; and use Illuminate imports.";
-        } elseif ($framework == 'react') {
-            $fullPrompt = "Generate a functional React Component (JSX code) using Tailwind CSS for styling for: '$userPrompt'. Use 'export default function'.";
-        } else {
-            $fullPrompt = "Generate a pure HTML structure using Tailwind CSS classes for: '$userPrompt'. Ensure it is responsive.";
+        if ($framework === 'laravel') {
+            $fullPrompt =
+                "Generate a complete Laravel Controller or Model (PHP code) for this requirement: '{$userPrompt}'. " .
+                "Include namespace App\\Http\\Controllers; and use Illuminate imports.";
+        } elseif ($framework === 'react') {
+            $fullPrompt =
+                "Generate a functional React Component (JSX code) using Tailwind CSS for styling for: '{$userPrompt}'. " .
+                "Use 'export default function'.";
+        } else { // tailwind
+            $fullPrompt =
+                "Generate a pure HTML structure using Tailwind CSS classes for: '{$userPrompt}'. " .
+                "Ensure it is responsive.";
         }
 
-        // 3. MODEL: Pakai 'gemini-2.0-flash'
-        $model = 'gemini-2.0-flash';
+        // Bisa diganti di .env: GEMINI_MODEL=gemini-1.5-flash / gemini-2.0-flash
+     $model = 'gemini-2.5-flash';
 
-        // 4. URL API YANG BENAR (Bersih)
-        $url = "[https://generativelanguage.googleapis.com/v1beta/models/](https://generativelanguage.googleapis.com/v1beta/models/){$model}:generateContent?key={$apiKey}";
+    $url = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
 
-        // 5. Kirim Request
         $response = Http::withoutVerifying()
-            ->withHeaders([
-                'Content-Type' => 'application/json',
-            ])->post($url, [
+            ->withHeaders(['Content-Type' => 'application/json'])
+            ->post($url, [
                 'contents' => [
                     [
                         'parts' => [
@@ -83,25 +82,27 @@ class CodeGeneratorController extends Controller
                 'generationConfig' => [
                     'temperature' => 0.2,
                     'maxOutputTokens' => 4000,
-                ]
+                ],
             ]);
 
         if ($response->failed()) {
             throw new \Exception("Gemini Error ({$response->status()}): " . $response->body());
         }
 
-        // 6. Ambil Hasil Respons
-        $responseData = $response->json();
-        $rawText = $responseData['candidates'][0]['content']['parts'][0]['text'] ?? '// Maaf, AI tidak memberikan output code.';
+        $data = $response->json();
+        $rawText = $data['candidates'][0]['content']['parts'][0]['text'] ?? '';
 
-        // 7. Bersihkan Markdown
+        if (trim($rawText) === '') {
+            $rawText = '// Maaf, AI tidak memberikan output code.';
+        }
+
         return $this->cleanMarkdown($rawText);
     }
 
-    private function cleanMarkdown($text)
+    private function cleanMarkdown(string $text): string
     {
-        $text = preg_replace('/^```[a-z]*\n/m', '', $text);
-        $text = preg_replace('/```$/m', '', $text);
+        $text = preg_replace('/^```[a-z]*\s*/mi', '', $text);
+        $text = preg_replace('/\s*```$/m', '', $text);
         return trim($text);
     }
 }
