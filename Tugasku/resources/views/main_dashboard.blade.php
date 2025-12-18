@@ -6,9 +6,7 @@
     <title>Tugasku - AI Automation Workspace</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
-    
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <script>
@@ -260,20 +258,26 @@
                         </button>
                     </div>
 
-                    <div class="group relative bg-dark-surface rounded-2xl border border-dark-border p-6 opacity-75 hover:opacity-100 transition-all hover:border-pink-500/50">
+                    <a href="{{ route('code_generator.index') }}" class="group relative bg-dark-surface rounded-2xl border border-dark-border p-6 hover:border-pink-500/50 transition-all hover:-translate-y-1 hover:shadow-2xl hover:shadow-pink-900/20 block">
+                        <div class="absolute top-4 right-4">
+                             <span class="w-2 h-2 rounded-full bg-pink-500 animate-pulse"></span>
+                        </div>
+
                         <div class="flex justify-between items-start mb-4">
                             <div class="w-12 h-12 rounded-xl bg-dark-input flex items-center justify-center border border-dark-border text-pink-500 group-hover:bg-pink-500 group-hover:text-white transition-all">
                                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
                             </div>
                         </div>
-                        <h3 class="text-lg font-bold text-white mb-2">Code Generator</h3>
-                        <p class="text-sm text-slate-500 mb-4">
-                            Generate boilerplate code Laravel/React dari deskripsi teks sederhana. 
+                        
+                        <h3 class="text-lg font-bold text-white mb-2 group-hover:text-pink-400 transition-colors">Code Generator</h3>
+                        <p class="text-sm text-slate-500 mb-4 line-clamp-2">
+                            Generate boilerplate code Laravel controller, React component, atau Tailwind layout dari deskripsi teks sederhana.
                         </p>
-                        <button class="w-full py-2 rounded-lg border border-dashed border-slate-600 text-slate-500 text-sm cursor-not-allowed">
-                            Segera Hadir
-                        </button>
-                    </div>
+                        
+                        <div class="flex items-center text-pink-500 font-semibold text-sm group-hover:gap-2 transition-all">
+                            Buka Generator <span class="ml-1">→</span>
+                        </div>
+                    </a>
 
                     <div class="group relative bg-dark-surface rounded-2xl border border-dark-border p-6 opacity-75 hover:opacity-100 transition-all hover:border-orange-500/50">
                         <div class="flex justify-between items-start mb-4">
@@ -407,7 +411,6 @@
     </div>
 
     <script>
-        // Bisa ditambahkan logika JS di sini jika ingin interaktifitas lebih
         console.log("Tugasku System Loaded.");
     </script>
 </body>

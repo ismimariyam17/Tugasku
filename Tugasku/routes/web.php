@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\DatasetController;
+use App\Http\Controllers\CodeGeneratorController;
 
 // 2. DASHBOARD UTAMA (LOBI MATA KULIAH)
 // Ini rute baru '/dashboard'. Saat diakses, ia akan menampilkan file 'main_dashboard.blade.php' yang baru kita buat.
@@ -41,4 +42,9 @@ Route::prefix('data-science')->group(function () {
 
     // Rute klasifikasi (KNN)
     Route::post('/datasets/{dataset}/classify', [DatasetController::class, 'classify'])->name('datasets.classify');
+});
+
+Route::prefix('code-generator')->group(function () {
+    Route::get('/', [CodeGeneratorController::class, 'index'])->name('code_generator.index');
+    Route::post('/generate', [CodeGeneratorController::class, 'generate'])->name('code_generator.generate');
 });
