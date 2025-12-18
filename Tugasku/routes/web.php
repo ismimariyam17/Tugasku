@@ -3,7 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\DatasetController;
 use App\Http\Controllers\CodeGeneratorController;
-
+use App\Http\Controllers\DeepLearningController;
 // 2. DASHBOARD UTAMA (LOBI MATA KULIAH)
 // Ini rute baru '/dashboard'. Saat diakses, ia akan menampilkan file 'main_dashboard.blade.php' yang baru kita buat.
 // Kita beri nama 'dashboard' agar konsisten dengan link di file lain.
@@ -48,3 +48,6 @@ Route::prefix('code-generator')->group(function () {
     Route::get('/', [CodeGeneratorController::class, 'index'])->name('code_generator.index');
     Route::post('/generate', [CodeGeneratorController::class, 'generate'])->name('code_generator.generate');
 });
+
+Route::get('/deep-learning', [DeepLearningController::class, 'index'])->name('deep_learning.index');
+Route::post('/deep-learning/process', [DeepLearningController::class, 'process'])->name('deep_learning.process');
