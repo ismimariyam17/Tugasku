@@ -126,7 +126,7 @@
                                             <input type="radio" name="model_type" value="CNN" checked class="text-accent-indigo bg-dark-bg border-slate-600">
                                             <div class="flex flex-col">
                                                 <span class="text-sm font-semibold text-white">CNN (Convolutional)</span>
-                                                <span class="text-xs text-slate-500">Gambar/Visi</span>
+                                                <span class="text-xs text-slate-500">Gambar/Visi/Tabular 1D</span>
                                             </div>
                                         </div>
                                     </label>
@@ -189,9 +189,6 @@
 
         // Tampilkan Loading saat submit
         function showLoading() {
-            // Kita biarkan form submit berjalan, SweetAlert loading akan muncul sebentar
-            // sebelum halaman reload (karena ini request sync).
-            // Jika training lama, nanti user akan melihat loading browser.
             Swal.fire({
                 title: 'Sedang Mengupload...',
                 text: 'Mohon tunggu, dataset sedang diproses.',
@@ -205,23 +202,48 @@
             });
         }
 
-        // POPUP SUKSES DARI CONTROLLER (Flash Session)
-        @if(session('success'))
+        // --- POPUP SUKSES DENGAN GRAFIK PLOTTING ---
+      @if(session('success'))
             Swal.fire({
-                title: 'Training Selesai!',
-                text: "{!! session('success') !!}", // Pakai !! agar karakter khusus aman
+                title: 'Training & Saving Berhasil!',
+                html: `
+                    <div class="text-left text-sm space-y-3">
+                        <div class="flex justify-between items-center bg-dark-bg p-3 rounded-lg border border-dark-border">
+                            <span class="text-slate-400">Akurasi:</span>
+                            <span class="font-bold text-accent-indigo text-lg">{{ session('training_result')['accuracy'] ?? 0 }}%</span>
+                        </div>
+                        
+                        @if(session('plot_url'))
+                            <div class="p-1 bg-white rounded-lg">
+                                <img src="{{ session('plot_url') }}" alt="Training Graph" class="w-full rounded-md shadow-sm">
+                            </div>
+                        @endif
+
+                        @if(session('model_url'))
+                            <a href="{{ session('model_url') }}" class="flex items-center justify-center gap-2 w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors font-semibold">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                                Download Model (.h5)
+                            </a>
+                            <p class="text-[10px] text-center text-slate-500">
+                                File ini berisi "Otak AI" yang sudah pintar. <br> 
+                                Bisa digunakan untuk prediksi di masa depan.
+                            </p>
+                        @endif
+                    </div>
+                `,
                 icon: 'success',
                 background: '#151F32',
                 color: '#fff',
+                width: '600px', 
                 confirmButtonColor: '#6366f1',
-                confirmButtonText: 'Mantap!'
+                confirmButtonText: 'Tutup'
             });
         @endif
 
-        // POPUP ERROR
+        // --- POPUP ERROR ---
         @if($errors->any())
              Swal.fire({
-                title: 'Gagal Upload!',
+                title: 'Error!',
                 html: '<ul class="text-left text-sm">@foreach($errors->all() as $error)<li class="mb-1 text-rose-400">• {{ $error }}</li>@endforeach</ul>',
                 icon: 'error',
                 background: '#151F32',
