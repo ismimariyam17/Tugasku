@@ -55,3 +55,5 @@ Route::get('/download-model/{filename}', function ($filename) {
     return response()->download($path, 'trained_model.h5');
 })->name('download.model');
 
+// Tambahkan di bawah deep-learning/process
+Route::post('/deep-learning/predict', [DeepLearningController::class, 'predict'])->name('deep_learning.predict');

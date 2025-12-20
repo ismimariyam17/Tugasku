@@ -5,134 +5,134 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\Process\Process;
+use App\Models\TrainingHistory; 
 
 class DeepLearningController extends Controller
 {
     public function index()
     {
-        return view('deep_learning_index');
+        $histories = TrainingHistory::latest()->get();
+        return view('deep_learning_index', compact('histories'));
+    }
+
+    private function runPythonScript($mode, $request, $datasetPath)
+    {
+        $modelPath = Storage::path('public/models/model_latest.h5');
+        $scalerPath = Storage::path('public/models/scaler_latest.save');
+        
+        Storage::makeDirectory('public/models');
+        Storage::makeDirectory('public/plots');
+
+        $plotPath = "";
+        $plotFilename = ""; 
+
+        if ($mode == 'train') {
+            $plotFilename = 'plot_' . time() . '.png';
+            $plotPath = Storage::path('public/plots/' . $plotFilename);
+        }
+
+        if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+            $datasetPath = str_replace('/', '\\', $datasetPath);
+            $modelPath = str_replace('/', '\\', $modelPath);
+            $scalerPath = str_replace('/', '\\', $scalerPath);
+            $plotPath = str_replace('/', '\\', $plotPath);
+        }
+
+        $scriptPath = base_path('scripts/train_model.py');
+        $pythonPath = "C:\\laragon\\bin\\python\\python-3.10\\python.EXE"; 
+
+        $args = [
+            $pythonPath, $scriptPath,
+            '--mode', $mode,
+            '--dataset', $datasetPath,
+            '--model_file', $modelPath,
+            '--scaler_file', $scalerPath
+        ];
+
+        if ($mode == 'train') {
+            $args = array_merge($args, [
+                '--type', $request->model_type,
+                '--epochs', (string)$request->epochs,
+                '--lr', (string)$request->learning_rate,
+                '--plot_file', $plotPath
+            ]);
+        }
+
+        $process = new Process($args);
+        
+        $process->setEnv([
+            'SYSTEMROOT' => getenv('SYSTEMROOT') ?: 'C:\\Windows', 
+            'TEMP' => getenv('TEMP') ?: 'C:\\Windows\\Temp',
+            'TMP' => getenv('TMP') ?: 'C:\\Windows\\Temp',
+            'PATH' => getenv('PATH'),
+            'MPLCONFIGDIR' => getenv('TEMP') ?: 'C:\\Windows\\Temp',
+            'USERPROFILE' => getenv('USERPROFILE') ?: 'C:\\Users\\Public'
+        ]);
+        
+        $process->setTimeout(600);
+        $process->run();
+
+        $output = $process->getOutput();
+        $result = json_decode($output, true);
+
+        if (!$process->isSuccessful() && !isset($result['error'])) {
+             dd(['STATUS' => 'PYTHON ERROR', 'MSG' => $process->getErrorOutput(), 'OUT' => $output]);
+        }
+
+        if (isset($result['error'])) return ['error' => $result['error']];
+
+        if ($mode == 'train') {
+            $result['plot_url'] = route('display.plot', ['filename' => $plotFilename]);
+            $result['model_url'] = route('download.model', ['filename' => 'model_latest.h5']);
+            
+            TrainingHistory::create([
+                'model_type' => $request->model_type,
+                'epochs' => $request->epochs,
+                'accuracy' => $result['accuracy'],
+                'loss' => $result['loss'],
+                'plot_file' => $plotFilename,
+                'model_file' => 'model_latest.h5'
+            ]);
+        }
+
+        return $result;
     }
 
     public function process(Request $request)
     {
-        // 1. VALIDASI
         $request->validate([
-            'dataset' => 'required|file|mimes:csv,json,xlsx,zip|max:51200', 
+            'dataset' => 'required|file|mimes:csv,xlsx',
             'model_type' => 'required|string', 
-            'epochs' => 'required|integer|min:1|max:100',
+            'epochs' => 'required|integer',
             'learning_rate' => 'required|numeric',
         ]);
 
-        try {
-            if ($request->hasFile('dataset')) {
-                // A. SIMPAN DATASET
-                $file = $request->file('dataset');
-                $filename = time() . '_' . $file->getClientOriginalName();
-                $relativePath = $file->storeAs('datasets', $filename);
-                $absolutePath = Storage::path($relativePath);
-                if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') $absolutePath = str_replace('/', '\\', $absolutePath);
+        $file = $request->file('dataset');
+        $path = $file->storeAs('datasets', 'train_' . time() . '.csv');
+        $absPath = Storage::path($path);
 
-                // B. PERSIAPAN FILE PLOT
-                $plotFilename = 'plot_' . time() . '.png';
-                Storage::makeDirectory('public/plots');
-                $plotAbsolutePath = Storage::path('public/plots/' . $plotFilename);
-                if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') $plotAbsolutePath = str_replace('/', '\\', $plotAbsolutePath);
+        $result = $this->runPythonScript('train', $request, $absPath);
 
-                // C. PERSIAPAN FILE MODEL (FITUR BARU)
-                $modelFilename = 'model_' . time() . '.h5';
-                Storage::makeDirectory('public/models'); // Buat folder models
-                $modelAbsolutePath = Storage::path('public/models/' . $modelFilename);
-                if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') $modelAbsolutePath = str_replace('/', '\\', $modelAbsolutePath);
+        if (isset($result['error'])) return back()->withErrors(['error' => $result['error']]);
 
-                // D. JALANKAN PYTHON
-                $scriptPath = base_path('scripts/train_model.py');
-                $pythonPath = "C:\\laragon\\bin\\python\\python-3.10\\python.EXE"; 
-
-                $process = new Process([
-                    $pythonPath, 
-                    $scriptPath,
-                    '--dataset', $absolutePath,
-                    '--type', $request->model_type,
-                    '--epochs', (string)$request->epochs,
-                    '--lr', (string)$request->learning_rate,
-                    '--batch_size', '32',
-                    '--plot_file', $plotAbsolutePath,
-                    '--model_file', $modelAbsolutePath // <-- Kirim Path Model
-                ]);
-
-                // Environment Variables
-                $process->setEnv([
-                    'SYSTEMROOT' => getenv('SYSTEMROOT') ?: 'C:\\Windows', 
-                    'TEMP' => getenv('TEMP') ?: 'C:\\Windows\\Temp',
-                    'TMP' => getenv('TMP') ?: 'C:\\Windows\\Temp',
-                    'PATH' => getenv('PATH'),
-                    'MPLCONFIGDIR' => getenv('TEMP') ?: 'C:\\Windows\\Temp',
-                    'USERPROFILE' => getenv('USERPROFILE') ?: 'C:\\Users\\Public',
-                    'HOMEDRIVE' => getenv('HOMEDRIVE') ?: 'C:',
-                    'HOMEPATH' => getenv('HOMEPATH') ?: '\\Users\\Public',
-                ]);
-                
-                $process->setTimeout(600);
-                $process->run();
-
-                // E. CEK HASIL
-                $output = $process->getOutput();
-                $result = json_decode($output, true);
-
-                if (!$process->isSuccessful() && !isset($result['error']) && !isset($result['status'])) {
-                     dd(['STATUS' => 'PYTHON ERROR', 'MSG' => $process->getErrorOutput(), 'OUT' => $output]);
-                }
-
-                if (isset($result['error'])) {
-                    return back()->withErrors(['error' => 'Error: ' . $result['error']]);
-                }
-
-                // F. SUKSES
-                if (isset($result['status']) && $result['status'] == 'success') {
-                    
-                    // URL Grafik & URL Download Model
-                    $plotUrl = route('display.plot', ['filename' => $plotFilename]);
-                    $modelUrl = route('download.model', ['filename' => $modelFilename]);
-
-                    $pesanSukses = "Training Selesai! Model disimpan.";
-
-                    return back()
-                        ->with('success', $pesanSukses)
-                        ->with('plot_url', $plotUrl) 
-                        ->with('model_url', $modelUrl) // <-- Kirim Link Download
-                        ->with('training_result', $result);
-                }
-            }
-            return back()->withErrors(['dataset' => 'Gagal upload file.']);
-
-        } catch (\Exception $e) {
-            return back()->withErrors(['error' => 'System Error: ' . $e->getMessage()]);
-        }
+        return back()
+            ->with('success', 'Training Selesai! Data disimpan ke Riwayat.')
+            ->with('training_result', $result);
     }
-    public function displayPlot(Request $request)
-    { 
-        $filename = $request->query('filename');
-        $filePath = storage_path('app/public/plots/' . $filename);
 
-        if (!file_exists($filePath)) {
-            abort(404);
-        }
-
-        return response()->file($filePath);
-    }
-    public function downloadModel(Request $request)
+    public function predict(Request $request)
     {
-        $filename = $request->query('filename');
-        $filePath = storage_path('app/public/models/' . $filename);
+        $request->validate(['dataset_predict' => 'required|file|mimes:csv,xlsx']);
 
-        if (!file_exists($filePath)) {
-            abort(404);
-        }
+        $file = $request->file('dataset_predict');
+        $path = $file->storeAs('datasets', 'predict_' . time() . '.csv');
+        $absPath = Storage::path($path);
 
-        return response()->download($filePath, $filename, [
-            'Content-Type' => 'application/octet-stream',
-        ]);
+        $result = $this->runPythonScript('predict', $request, $absPath);
+
+        if (isset($result['error'])) return back()->withErrors(['error' => $result['error']]);
+
+        // --- UPDATE: Kirim data lengkap (Kelas + Confidence) ke View ---
+        return back()->with('prediction_data', $result['predictions']);
     }
 }
-
-    
